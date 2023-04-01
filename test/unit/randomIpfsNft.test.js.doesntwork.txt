@@ -1,0 +1,82 @@
+// Load dependencies
+const { expect } = require("chai")
+const { ethers, deployments } = require("hardhat")
+const { networkConfig } = require("../../helper-hardhat-config")
+
+// Start test block
+describe("RandomIpfsNft", function () {
+    let randomIpfsNft, vrfCoordinatorV2Mock
+    let deployer
+
+    const mintFee = ethers.utils.parseEther("0.1")
+
+    beforeEach(async function () {
+        // Get the ContractFactory and Signers here.
+        const RandomIpfsNft = await ethers.getContractFactory("RandomIpfsNft")
+        const accounts = await ethers.getSigners()
+        deployer = accounts[0]
+
+        await deployments.fixture(["mocks", "randomipfs"])
+        randomIpfsNft = await ethers.getContract("RandomIpfsNft")
+        vrfCoordinatorV2Mock = await ethers.getContract("VRFCoordinatorV2Mock")
+    })
+    // Test cases
+    it("should deploy correctly", async function () {
+        expect(await randomIpfsNft.name()).to.equal("Randnom IPFS NFT")
+        expect(await randomIpfsNft.symbol()).to.equal("RIN")
+    })
+
+    it("should allow minting of NFTs", async function () {
+        // Request an NFT
+        console.log("0")
+        const mintTx = await randomIpfsNft.requestNft({
+            value: mintFee,
+        })
+        console.log("1")
+
+        // Wait for the transaction to be mined
+        await mintTx.wait()
+        console.log("2")
+
+        // Check that the token URI has been set correctly
+        const tokenId = await randomIpfsNft.getTokenCounter()
+        console.log(tokenId.toString()) /////////////////////////// the problem is somewhere here
+        const tokenUri = await randomIpfsNft.tokenURI(tokenId)
+        console.log("4")
+        expect(tokenUri).to.equal(randomIpfsNft.getDogTokenUris(0))
+        console.log("5")
+    })
+
+    it("should revert if not enough Ether is sent when minting an NFT", async function () {
+        // Try to mint an NFT without sending enough Ether
+        await expect(
+            randomIpfsNft.requestNft({
+                value: mintFee - 1,
+            })
+        ).to.be.revertedWith("RandomIpfsNft__NeedMoreETHSent")
+    })
+
+    it("should allow the owner to withdraw Ether", async function () {
+        // Get the initial balance of the contract
+        const initialBalance = await ethers.provider.getBalance(randomIpfsNft.address)
+
+        // Withdraw the Ether
+        const withdrawTx = await randomIpfsNft.withdraw()
+
+        // Wait for the transaction to be mined
+        await withdrawTx.wait()
+
+        // Get the final balance of the contract
+        const finalBalance = await ethers.provider.getBalance(randomIpfsNft.address)
+
+        // Check that the balance has been transferred to the owner
+        expect(finalBalance).to.equal(0)
+        const ownerBalance = await ethers.provider.getBalance(deployer.address)
+        expect(ownerBalance).to.be.gt(initialBalance)
+    })
+
+    it("should return the correct Breed from the random number", async function () {
+        const breed = await randomIpfsNft.getBreedFromModdedRng(30)
+        expect(breed).to.equal("SHIBAINU")
+    })
+})

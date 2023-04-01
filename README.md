@@ -1,3 +1,7 @@
+this is a repo where i should continue working on, it seems like i cant actually use the dynamic nft and i should make 100% tests
+
+
+
 this repo has 3 contracts
 
 1. Basic NFT
